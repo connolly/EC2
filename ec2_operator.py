@@ -4,28 +4,32 @@ import boto.ec2
 import croniter
 import datetime
 
-def time_to_action(sched, now, seconds):
+def change_state (state, sched_start, sched_stop, now):
+   '''Determine if timeis within the start and stop window and return that the state should be changed'''      
+
+   changeState = False
+   
    try:
-      cron = croniter.croniter(sched, now)
-      d1 = now + datetime.timedelta(0, seconds)
-      if (seconds > 0):
-         d2 = cron.get_next(datetime.datetime)
-         ret = (now < d2 and d2 < d1)
-      else:
-         d2 = cron.get_prev(datetime.datetime)
-         ret = (d1 < d2 and d2 < now)
-      print "now %s" % now
-      print "d1 %s" % d1
-      print "d2 %s" % d2
+      cronStart = croniter.croniter(sched_start,now)
+      nextStart = cronStart.get_next(datetime.datetime)
+
+      cronStop = croniter.croniter(sched_stop,now)
+      nextStop = cronStop.get_next(datetime.datetime)
+
+      if (state == 'running' and (nextStop >= nextStart)):
+         changeState = True
+      elif (state == 'stopped' and (nextStart >= nextStop)):
+         changeState = 'True'
    except:
-      ret = False
-   print "time_to_action %s" % ret
-   return ret
+      return False
+
+   return changeState
 
 now = datetime.datetime.now()
 
-conn=boto.ec2.connect_to_region('us-east-1')
+conn=boto.ec2.connect_to_region('us-west-2')
 reservations = conn.get_all_instances()
+
 start_list = []
 stop_list = []
 for res in reservations:
@@ -35,10 +39,11 @@ for res in reservations:
       stop_sched = inst.tags['auto:stop'] if 'auto:stop' in inst.tags else None
       state = inst.state
       print "%s (%s) [%s] [%s] [%s]" % (name, inst.id, state, start_sched, stop_sched)
-      if start_sched != None and state == "stopped" and time_to_action(start_sched, now, 31 * 60):
+      if start_sched != None and state == "stopped" and change_state(state, sched_start, sched_stop, now):
         start_list.append(inst.id)
-      if stop_sched != None and state == "running" and time_to_action(stop_sched, now, 31 * -60):
+      if stop_sched != None and state == "running" and change_state(state, sched_start, sched_stop, now):
         stop_list.append(inst.id)
+
 if len(start_list) > 0:
    ret = conn.start_instances(instance_ids=start_list, dry_run=False)
    print "start_instances %s" % ret
