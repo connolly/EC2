@@ -39,9 +39,9 @@ for res in reservations:
       stop_sched = inst.tags['auto:stop'] if 'auto:stop' in inst.tags else None
       state = inst.state
       print "%s (%s) [%s] [%s] [%s]" % (name, inst.id, state, start_sched, stop_sched)
-      if start_sched != None and state == "stopped" and change_state(state, sched_start, sched_stop, now):
+      if start_sched != None and state == "stopped" and change_state(state, start_sched, stop_sched, now):
         start_list.append(inst.id)
-      if stop_sched != None and state == "running" and change_state(state, sched_start, sched_stop, now):
+      if stop_sched != None and state == "running" and change_state(state, start_sched, stop_sched, now):
         stop_list.append(inst.id)
 
 if len(start_list) > 0:
